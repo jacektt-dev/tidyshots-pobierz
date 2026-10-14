@@ -1,0 +1,558 @@
+<!doctype html>
+<html lang="pl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>TidyShots - intro</title>
+<style>
+  html,body{margin:0;height:100%;background:#000;overflow:hidden;cursor:pointer}
+  #wrap{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);box-shadow:0 0 80px rgba(80,120,255,.25)}
+  canvas{display:block;width:100%;height:100%;image-rendering:pixelated;image-rendering:crisp-edges;filter:saturate(1.25) contrast(1.08)}
+  #scan{position:absolute;inset:0;pointer-events:none;background:linear-gradient(rgba(0,0,0,.32) 50%,rgba(0,0,0,0) 50%)}
+  #vig{position:absolute;inset:0;pointer-events:none;background:radial-gradient(ellipse at center,rgba(0,0,0,0) 62%,rgba(0,0,0,.6) 100%)}
+</style>
+</head>
+<body>
+<div id="wrap"><canvas id="c" width="320" height="200"></canvas><div id="scan"></div><div id="vig"></div></div>
+<script>
+"use strict";
+/* =====================================================================
+   TIDYSHOTS - retro intro (cracktro) w jednym pliku.
+   Grafika: canvas 320x200 jak Amiga/Atari. Muzyka: syntezator Web Audio
+   (4 kanały jak w chipach 8/16-bit). Klawisze: M = wycisz, F = pełny ekran.
+   ===================================================================== */
+const W = 320, H = 200;
+const cv = document.getElementById('c'), g = cv.getContext('2d');
+g.imageSmoothingEnabled = false;
+
+/* ---------- skalowanie i efekt CRT ---------- */
+function fit() {
+  const s = Math.min(innerWidth / W, innerHeight / H);
+  const wrap = document.getElementById('wrap');
+  wrap.style.width = (W * s) + 'px'; wrap.style.height = (H * s) + 'px';
+  document.getElementById('scan').style.backgroundSize = '100% ' + s + 'px';
+}
+addEventListener('resize', fit); fit();
+
+/* ---------- czcionka 5x7 ---------- */
+const FONT_SRC = {
+' ':'.....|.....|.....|.....|.....|.....|.....',
+'A':'.###.|#...#|#...#|#####|#...#|#...#|#...#','B':'####.|#...#|#...#|####.|#...#|#...#|####.',
+'C':'.###.|#...#|#....|#....|#....|#...#|.###.','D':'####.|#...#|#...#|#...#|#...#|#...#|####.',
+'E':'#####|#....|#....|####.|#....|#....|#####','F':'#####|#....|#....|####.|#....|#....|#....',
+'G':'.###.|#...#|#....|#.###|#...#|#...#|.####','H':'#...#|#...#|#...#|#####|#...#|#...#|#...#',
+'I':'.###.|..#..|..#..|..#..|..#..|..#..|.###.','J':'..###|...#.|...#.|...#.|...#.|#..#.|.##..',
+'K':'#...#|#..#.|#.#..|##...|#.#..|#..#.|#...#','L':'#....|#....|#....|#....|#....|#....|#####',
+'M':'#...#|##.##|#.#.#|#.#.#|#...#|#...#|#...#','N':'#...#|#...#|##..#|#.#.#|#..##|#...#|#...#',
+'O':'.###.|#...#|#...#|#...#|#...#|#...#|.###.','P':'####.|#...#|#...#|####.|#....|#....|#....',
+'Q':'.###.|#...#|#...#|#...#|#.#.#|#..#.|.##.#','R':'####.|#...#|#...#|####.|#.#..|#..#.|#...#',
+'S':'.####|#....|#....|.###.|....#|....#|####.','T':'#####|..#..|..#..|..#..|..#..|..#..|..#..',
+'U':'#...#|#...#|#...#|#...#|#...#|#...#|.###.','V':'#...#|#...#|#...#|#...#|#...#|.#.#.|..#..',
+'W':'#...#|#...#|#...#|#.#.#|#.#.#|#.#.#|.#.#.','X':'#...#|#...#|.#.#.|..#..|.#.#.|#...#|#...#',
+'Y':'#...#|#...#|.#.#.|..#..|..#..|..#..|..#..','Z':'#####|....#|...#.|..#..|.#...|#....|#####',
+'0':'.###.|#...#|#..##|#.#.#|##..#|#...#|.###.','1':'..#..|.##..|..#..|..#..|..#..|..#..|.###.',
+'2':'.###.|#...#|....#|...#.|..#..|.#...|#####','3':'####.|....#|....#|.###.|....#|....#|####.',
+'4':'...#.|..##.|.#.#.|#..#.|#####|...#.|...#.','5':'#####|#....|####.|....#|....#|#...#|.###.',
+'6':'.###.|#....|#....|####.|#...#|#...#|.###.','7':'#####|....#|...#.|..#..|.#...|.#...|.#...',
+'8':'.###.|#...#|#...#|.###.|#...#|#...#|.###.','9':'.###.|#...#|#...#|.####|....#|....#|.###.',
+'.':'.....|.....|.....|.....|.....|.##..|.##..',',':'.....|.....|.....|.....|.##..|..#..|.#...',
+'!':'..#..|..#..|..#..|..#..|..#..|.....|..#..','?':'.###.|#...#|....#|...#.|..#..|.....|..#..',
+'-':'.....|.....|.....|.###.|.....|.....|.....',':':'.....|.##..|.##..|.....|.##..|.##..|.....',
+'/':'....#|....#|...#.|..#..|.#...|#....|#....','+':'.....|..#..|..#..|#####|..#..|..#..|.....',
+'%':'##..#|##..#|...#.|..#..|.#...|#..##|#..##','(':'...#.|..#..|.#...|.#...|.#...|..#..|...#.',
+')':'.#...|..#..|...#.|...#.|...#.|..#..|.#...',"'":'..#..|..#..|.#...|.....|.....|.....|.....',
+'"':'.#.#.|.#.#.|.....|.....|.....|.....|.....','>':'.#...|..#..|...#.|....#|...#.|..#..|.#...',
+'<':'...#.|..#..|.#...|#....|.#...|..#..|...#.','=':'.....|.....|#####|.....|#####|.....|.....',
+'*':'.....|#.#.#|.###.|#####|.###.|#.#.#|.....','#':'.#.#.|.#.#.|#####|.#.#.|#####|.#.#.|.#.#.',
+'&':'.##..|#..#.|#.#..|.#...|#.#.#|#..#.|.##.#','_':'.....|.....|.....|.....|.....|.....|#####',
+'@':'.###.|#...#|#.###|#.#.#|#.###|#....|.###.','~':'.....|.#.#.|#####|#####|.###.|..#..|.....'
+};
+const FONT = {};
+for (const k in FONT_SRC) FONT[k] = FONT_SRC[k].replace(/\|/g, '').split('').map(c => c === '#' ? 1 : 0);
+const PL = {'Ą':'A','Ć':'C','Ę':'E','Ł':'L','Ń':'N','Ó':'O','Ś':'S','Ź':'Z','Ż':'Z'};
+const clean = s => s.toUpperCase().replace(/[ĄĆĘŁŃÓŚŹŻ]/g, c => PL[c]).split('').map(c => FONT[c] ? c : ' ').join('');
+
+const gcache = new Map();
+function glyph(ch, s, col) {
+  const k = ch + '|' + s + '|' + col;
+  let c = gcache.get(k);
+  if (c) return c;
+  c = document.createElement('canvas'); c.width = 5 * s; c.height = 7 * s;
+  const x = c.getContext('2d'); x.fillStyle = col;
+  const b = FONT[ch] || FONT[' '];
+  for (let r = 0; r < 7; r++) for (let q = 0; q < 5; q++) if (b[r * 5 + q]) x.fillRect(q * s, r * s, s, s);
+  gcache.set(k, c); return c;
+}
+function text(ctx, str, x, y, s, col) {
+  str = clean(str);
+  for (let i = 0; i < str.length; i++) if (str[i] !== ' ') ctx.drawImage(glyph(str[i], s, col), x + i * 6 * s, y);
+}
+const textW = (str, s) => clean(str).length * 6 * s - s;
+
+/* =====================================================================
+   TREŚĆ
+   ===================================================================== */
+const PAGES = [
+  ['*** TIDYSHOTS ***',
+   'ZDJĘCIA I FILMY Z TELEFONU',
+   'LŻEJSZE I WRESZCIE',
+   'POUKŁADANE',
+   '',
+   'ANDROID CZY IPHONE - OBA OK!',
+   'JEDEN KLIK - RESZTA SAMA',
+   'BEZ INSTALOWANIA',
+   'BEZ KOMBINOWANIA'],
+  ['*** ODCHUDZANIE ***',
+   'FILMY MNIEJSZE NAWET O 90%',
+   'ZDJĘCIA PRAWIE O POŁOWĘ',
+   'A WYGLĄDAJĄ TAK SAMO',
+   '',
+   'ZDJĘCIA Z IPHONE\'A',
+   'OTWORZYSZ NA KAŻDYM KOMPUTERZE',
+   'DATY I MIEJSCA ZOSTAJĄ',
+   'DYSK WRESZCIE ODDYCHA'],
+  ['*** PORZĄDEK ***',
+   'SAM WIE, GDZIE JEST DOM',
+   'ZNAJDZIE WSZYSTKIE WYJAZDY',
+   'I ULUBIONE MIEJSCA',
+   'FOLDERY NAZWIE OD MIEJSC:',
+   '   202407_CHORWACJA',
+   '   202305_MAZURY',
+   'RESZTA - ŁADNIE WEDŁUG LAT',
+   'CHCESZ INACZEJ? ZMIEŃ NAZWĘ'],
+  ['*** BEZ STRESU ***',
+   'ORYGINAŁY? NIETYKALNE!',
+   'NAJPIERW POKAŻE PLAN',
+   'I ILE MIEJSCA ZYSKASZ',
+   'TY KLIKASZ START',
+   '',
+   'PRZERWIESZ? DOKOŃCZY POTEM',
+   'NOWE ZDJĘCIA? DOŁOŻY SAM',
+   'NA KONIEC: ILE BYŁO, ILE JEST'],
+  ['*** HIGH SCORE ***',
+   'ARCHIWUM JACKA',
+   'OK. 1900 ZDJĘĆ I FILMÓW',
+   '',
+   'PRZED:  47,5 GB',
+   'PO:      6,2 GB',
+   'ODZYSKANE: 41 GB (-87%)',
+   '',
+   'P1: JACEK    P2: CLAUDE'],
+  ['*** JAK ZACZĄĆ ***',
+   '1. DWA KLIKI: _TIDYSHOTS.BAT',
+   '2. WSKAŻ FOLDER ZE ZDJĘCIAMI',
+   '3. ZOBACZ PLAN, KLIKNIJ START',
+   '4. IDŹ NA KAWĘ',
+   '',
+   'DODATKI POBIERZE SAM',
+   'SPRZĘT ROZPOZNA SAM',
+   'PROSTE JAK PSTRYKNIĘCIE']
+];
+
+const SCROLL = '          YO!  TU JACEK & CLAUDE CREW Z NOWYM WYDANIEM ...  ' +
+  'TIDYSHOTS - PROGRAM, KTÓRY ROBI PORZĄDEK Z TYSIĄCAMI ZDJĘĆ I FILMÓW Z TELEFONU ...  ' +
+  'FILMY CHUDNĄ NAWET O 90%, ZDJĘCIA PRAWIE O POŁOWĘ - A DALEJ WYGLĄDAJĄ ŚWIETNIE ...  ' +
+  'ZDJĘCIA Z IPHONE\'A ZAMIENIA TAK, ŻE OTWORZYSZ JE NA KAŻDYM KOMPUTERZE ...  ' +
+  'A POTEM SAM UKŁADA WSZYSTKO W FOLDERY: WAKACJE W CHORWACJI, WEEKEND NA MAZURACH, WIZYTY U BABCI - ' +
+  'KAŻDY WYJAZD OSOBNO, Z NAZWĄ MIEJSCA ...  CHCESZ INACZEJ? ZMIEŃ NAZWĘ, ODZNACZ WIERSZ - TY TU RZĄDZISZ ...  ' +
+  'ORYGINAŁY ZOSTAJĄ NIETKNIĘTE, WYNIKI CZEKAJĄ W FOLDERZE _TIDYSHOTS ...  ' +
+  'REKORD DO POBICIA: 47,5 GB -> 6,2 GB !!!  ...  ' +
+  'POZDROWIENIA DLA:  FFMPEG  *  IMAGEMAGICK  *  WSZYSTKICH TELEFONÓW PEŁNYCH WSPOMNIEŃ  *  ' +
+  'DYSKÓW, KTÓRE WRESZCIE ODETCHNĄ  *  I DLA INTELIGENTNEJ KONTROLI APLIKACJI - NIE WYŁĄCZAJ JEJ!  ...  ' +
+  'KOD: CLAUDE  *  POMYSŁ I TESTY: JACEK  *  MUZYKA: SYNTEZATOR WEB AUDIO NA ŻYWO  ...  ' +
+  'SPACJA = PAUZA   M = WYCISZ   F = PEŁNY EKRAN  ...  ZAWIJAMY I ZACZYNAMY OD NOWA ...  ~ ~ ~          ';
+
+/* =====================================================================
+   MUZYKA (Web Audio): lead (puls 25%), arpeggio (puls 12,5%),
+   bas (trójkąt), perkusja (szum + sinus). 128 BPM, szesnastki.
+   ===================================================================== */
+const BPM = 128, STEP = 60 / BPM / 4;
+const midiF = m => 440 * Math.pow(2, (m - 69) / 12);
+function noteF(n) {
+  const m = /^([A-G])(#?)(\d)$/.exec(n);
+  const idx = {C:0, D:2, E:4, F:5, G:7, A:9, B:11}[m[1]] + (m[2] ? 1 : 0);
+  return midiF((+m[3] + 1) * 12 + idx);
+}
+const CH = {Am:[45,[0,3,7,12]], F:[41,[0,4,7,12]], C:[48,[0,4,7,12]], G:[43,[0,4,7,12]], E:[40,[0,4,7,12]]};
+const LA = ['A4 . C5 . E5 . A5 . G5 . . E5 . . D5 .', 'C5 . . . A4 . . C5 . . F5 . E5 . C5 .',
+            'E5 . G5 . C6 . . B5 . . G5 . E5 . G5 .', 'G5 . . . D5 . . B4 . . D5 . G5 . A5 .'].map(s => s.split(' '));
+const LB = ['C6 . . B5 . . A5 . . . E5 . . . A5 .', 'C6 . . A5 . . F5 . . . C6 . D6 . C6 .',
+            'B5 . . G5 . . D5 . . . B5 . C6 . D6 .', 'E6 . . . . . B5 . G#5 . . . E5 . - .'].map(s => s.split(' '));
+const SA = ['Am','F','C','G'], SB = ['Am','F','G','E'];
+const SONG = [];
+const sec = (chs, leads, dr) => chs.forEach((c, i) => SONG.push({c, lead: leads ? leads[i] : null, dr, fill: i === 3}));
+sec(SA, null, 'intro');
+const LOOP = SONG.length;
+sec(SA, LA, 'full'); sec(SB, LB, 'full'); sec(SA, LA, 'full'); sec(SB, LB, 'full'); sec(SA, null, 'none');
+
+let AC = null, master = null, delayIn = null, P125, P25, NOISE, nextT = 0, gstep = 0, muted = false;
+const events = [];
+const hit = {lead: -9, arp: -9, bass: -9, kick: -9, snare: -9, hat: -9};
+
+function pulse(d) {
+  const n = 48, re = new Float32Array(n), im = new Float32Array(n);
+  for (let k = 1; k < n; k++) re[k] = 2 * Math.sin(k * Math.PI * d) / (k * Math.PI);
+  return AC.createPeriodicWave(re, im);
+}
+function initAudio() {
+  try { AC = new (window.AudioContext || window.webkitAudioContext)(); } catch (e) { AC = null; return; }
+  document.addEventListener('visibilitychange', () => { if (document.hidden) stop(); });
+  master = AC.createGain(); master.gain.value = 0.5;
+  const comp = AC.createDynamicsCompressor(); master.connect(comp); comp.connect(AC.destination);
+  delayIn = AC.createGain(); delayIn.gain.value = 0.32;
+  const dl = AC.createDelay(1); dl.delayTime.value = STEP * 3;
+  const fb = AC.createGain(); fb.gain.value = 0.35;
+  const lp = AC.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 2600;
+  delayIn.connect(dl); dl.connect(lp); lp.connect(fb); fb.connect(dl); lp.connect(master);
+  P125 = pulse(0.125); P25 = pulse(0.25);
+  NOISE = AC.createBuffer(1, AC.sampleRate, AC.sampleRate);
+  const d = NOISE.getChannelData(0); for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
+}
+function tone(w, f, t, dur, vol, dests, vib) {
+  const o = AC.createOscillator();
+  if (typeof w === 'string') o.type = w; else o.setPeriodicWave(w);
+  o.frequency.value = f;
+  const gn = AC.createGain();
+  gn.gain.setValueAtTime(0, t);
+  gn.gain.linearRampToValueAtTime(vol, t + 0.004);
+  gn.gain.setTargetAtTime(vol * 0.65, t + 0.01, Math.max(0.02, dur * 0.4));
+  gn.gain.setTargetAtTime(0, t + dur, 0.015);
+  o.connect(gn); dests.forEach(d => gn.connect(d));
+  if (vib && dur > 0.25) {
+    const l = AC.createOscillator(), lg = AC.createGain();
+    l.frequency.value = 6; lg.gain.setValueAtTime(0, t); lg.gain.linearRampToValueAtTime(20, t + 0.3);
+    l.connect(lg); lg.connect(o.detune); l.start(t); l.stop(t + dur + 0.15);
+  }
+  o.start(t); o.stop(t + dur + 0.15);
+}
+function noise(t, dur, vol, type, freq) {
+  const s = AC.createBufferSource(); s.buffer = NOISE;
+  const f = AC.createBiquadFilter(); f.type = type; f.frequency.value = freq;
+  const gn = AC.createGain(); gn.gain.setValueAtTime(vol, t); gn.gain.exponentialRampToValueAtTime(0.001, t + dur);
+  s.connect(f); f.connect(gn); gn.connect(master);
+  s.start(t, Math.random() * 0.5); s.stop(t + dur + 0.02);
+}
+function kick(t) {
+  const o = AC.createOscillator(), gn = AC.createGain();
+  o.frequency.setValueAtTime(150, t); o.frequency.exponentialRampToValueAtTime(42, t + 0.12);
+  gn.gain.setValueAtTime(0.9, t); gn.gain.exponentialRampToValueAtTime(0.001, t + 0.28);
+  o.connect(gn); gn.connect(master); o.start(t); o.stop(t + 0.3);
+}
+function snare(t, vol) {
+  noise(t, 0.16, 0.32 * vol, 'bandpass', 1900);
+  tone('triangle', 190, t, 0.05, 0.25 * vol, [master]);
+}
+function barAt(i) { return i < SONG.length ? SONG[i] : SONG[LOOP + (i - LOOP) % (SONG.length - LOOP)]; }
+function ev(t, ch) { events.push({t, ch}); }
+function playStep(gs, t) {
+  const b = barAt(Math.floor(gs / 16)), s = gs % 16, [root, iv] = CH[b.c];
+  // bas
+  if (b.dr === 'none' ? s % 4 === 0 : s % 2 === 0) {
+    tone('triangle', midiF(root + (s % 4 === 2 ? 12 : 0)), t, STEP * 1.6, 0.34, [master]); ev(t, 'bass');
+  }
+  // arpeggio
+  tone(P125, midiF(root + 24 + iv[s % 4]), t, STEP * 0.85, 0.05, [master]); ev(t, 'arp');
+  // melodia
+  if (b.lead) {
+    const tok = b.lead[s];
+    if (tok !== '.' && tok !== '-') {
+      let len = 1; while (s + len < 16 && b.lead[s + len] === '.') len++;
+      tone(P25, noteF(tok), t, len * STEP * 0.95, 0.11, [master, delayIn], true); ev(t, 'lead');
+    }
+  }
+  // perkusja
+  const fill = b.fill && s >= 12;
+  if (fill && b.dr !== 'intro') { snare(t, 0.5 + (s - 12) * 0.17); ev(t, 'snare'); return; }
+  if (b.dr === 'full') {
+    if (s === 0 || s === 6 || s === 8 || (s === 14 && gs % 32 >= 16)) { kick(t); ev(t, 'kick'); }
+    if (s === 4 || s === 12) { snare(t, 1); ev(t, 'snare'); }
+    noise(t, 0.04, s % 4 === 2 ? 0.09 : 0.035, 'highpass', 7000); ev(t, 'hat');
+  } else if (b.dr === 'intro') {
+    if (s === 0 || s === 8) { kick(t); ev(t, 'kick'); }
+    if (s % 4 === 2) { noise(t, 0.04, 0.07, 'highpass', 7000); ev(t, 'hat'); }
+  }
+}
+// Muzyka gra 2 razy (ok. 1,5 min), potem wycisza się i pokaz sam się zatrzymuje.
+const END_STEP = (LOOP + 2 * (SONG.length - LOOP)) * 16;
+let endAt = 0;
+function sched() {
+  if (!AC) return;
+  while (nextT < AC.currentTime + 0.12 && gstep < END_STEP) { playStep(gstep, nextT); nextT += STEP; gstep++; }
+}
+function pumpEvents(now) {
+  if (!AC) return;
+  const ct = AC.currentTime;
+  while (events.length && events[0].t <= ct) hit[events.shift().ch] = now;
+}
+
+/* =====================================================================
+   GRAFIKA
+   ===================================================================== */
+// --- gwiazdy ---
+const stars = Array.from({length: 140}, () => ({x: Math.random() * 2 - 1, y: Math.random() * 2 - 1, z: Math.random()}));
+function drawStars(dt, speed) {
+  for (const s of stars) {
+    s.z -= dt * speed;
+    if (s.z <= 0.02) { s.x = Math.random() * 2 - 1; s.y = Math.random() * 2 - 1; s.z = 1; }
+    const sx = W / 2 + s.x / s.z * 110, sy = H / 2 + s.y / s.z * 70;
+    if (sx < 0 || sx >= W || sy < 0 || sy >= H) { s.z = 0; continue; }
+    const c = Math.floor(255 * (1 - s.z));
+    g.fillStyle = `rgb(${c},${c},${Math.min(255, c + 40)})`;
+    const sz = s.z < 0.3 ? 2 : 1;
+    g.fillRect(sx | 0, sy | 0, sz, sz);
+  }
+}
+// --- paski coppera za logo ---
+const COPPER_H = [0, 28, 52, 195, 285];
+function drawCopper(t) {
+  for (let i = 0; i < COPPER_H.length; i++) {
+    const cy = 24 + Math.sin(t * 1.6 + i * 1.25) * 19;
+    for (let k = -6; k <= 6; k++) {
+      const l = 1 - Math.abs(k) / 7;
+      g.fillStyle = `hsl(${COPPER_H[i]},90%,${5 + 30 * l}%)`;
+      const y = Math.round(cy + k);
+      if (y >= 0 && y < 48) g.fillRect(0, y, W, 1);
+    }
+  }
+}
+// --- logo z falującymi liniami ---
+const LOGO = 'TIDYSHOTS', LS = 4;
+const LOGO_PAL = ['#ffffff','#d8fff8','#a8fff0','#70f4e4','#38dcd4','#14bccc','#109cdc','#2078ec','#3458e4','#4840d4','#5a30bc','#62209c','#58187c','#401060'];
+function drawLogo(t, flash) {
+  const lw = LOGO.length * 6 * LS - LS, x0 = Math.round((W - lw) / 2), y0 = 4;
+  for (let pass = 0; pass < 2; pass++) {
+    for (let i = 0; i < LOGO.length; i++) {
+      const b = FONT[LOGO[i]];
+      for (let r = 0; r < 7; r++) for (let q = 0; q < 5; q++) {
+        if (!b[r * 5 + q]) continue;
+        for (let k = 0; k < LS; k++) {
+          const row = r * LS + k;
+          const wob = Math.round(Math.sin(t * 2.4 + row * 0.13) * 2.4);
+          const x = x0 + i * 6 * LS + q * LS + wob, y = y0 + row;
+          if (pass === 0) { g.fillStyle = '#000'; g.fillRect(x - 1, y - 1, LS + 2, 3); g.fillRect(x + 2, y + 2, LS, 1); }
+          else { g.fillStyle = flash > 0.5 && k === 0 ? '#fff' : LOGO_PAL[Math.floor(row / 2) % LOGO_PAL.length]; g.fillRect(x, y, LS, 1); }
+        }
+      }
+    }
+  }
+  const sub = '* JACEK & CLAUDE CREW * 2026 *';
+  const cols = ['#fff', '#ff0', '#0ff', '#f0f'];
+  text(g, sub, Math.round((W - textW(sub, 1)) / 2) + 1, 39, 1, '#000');
+  text(g, sub, Math.round((W - textW(sub, 1)) / 2), 38, 1, cols[Math.floor(t * 4) % 4]);
+}
+// --- linie rozdzielające ---
+function drawLine(y, t, bright) {
+  const gr = g.createLinearGradient(0, 0, W, 0);
+  for (let i = 0; i <= 6; i++) gr.addColorStop(i / 6, `hsl(${(t * 90 + i * 60) % 360},100%,${45 + bright * 35}%)`);
+  g.fillStyle = gr; g.fillRect(0, y, W, 2);
+}
+// --- panel z tekstem pisanym na maszynie ---
+const PX = 4, PY = 52, PW = 206, PH = 102, CPS = 45, HOLD = 4.2;
+const pageLen = p => PAGES[p].join('').length / CPS + HOLD;
+function drawPanel(t, startT) {
+  g.fillStyle = 'rgba(0,0,40,0.62)'; g.fillRect(PX, PY, PW, PH);
+  g.strokeStyle = `hsl(${(t * 60) % 360},90%,60%)`; g.lineWidth = 1; g.strokeRect(PX + 0.5, PY + 0.5, PW - 1, PH - 1);
+  let tt = t - startT, p = 0;
+  const total = PAGES.reduce((a, _, i) => a + pageLen(i), 0);
+  tt %= total;
+  while (tt > pageLen(p)) { tt -= pageLen(p); p++; }
+  let chars = Math.floor(tt * CPS), cx = 0, cy = 0;
+  const lines = PAGES[p];
+  for (let i = 0; i < lines.length && chars >= 0; i++) {
+    const ln = clean(lines[i]), shown = ln.slice(0, Math.max(0, chars));
+    const col = i === 0 ? '#ff0' : (/%|GB|^ *20\d{4}_|START/.test(ln) ? '#6f6' : '#9ef');
+    const x = i === 0 ? PX + Math.round((PW - textW(ln, 1)) / 2) : PX + 7;
+    text(g, shown, x, PY + 6 + i * 10.5 | 0, 1, col);
+    cx = x + shown.length * 6; cy = PY + 6 + i * 10.5 | 0;
+    chars -= ln.length;
+  }
+  if (Math.floor(t * 3) % 2 === 0) { g.fillStyle = '#fff'; g.fillRect(cx, cy, 5, 7); }
+}
+// --- kulki 3D (vector bobs) zmieniające kształt ---
+const N = 64;
+function shapes() {
+  const cube = [], sph = [], tor = [], hel = [];
+  for (let i = 0; i < 4; i++) for (let j = 0; j < 4; j++) for (let k = 0; k < 4; k++) cube.push([(i - 1.5) / 1.5 * 0.8, (j - 1.5) / 1.5 * 0.8, (k - 1.5) / 1.5 * 0.8]);
+  for (let i = 0; i < N; i++) {
+    const y = 1 - (i + 0.5) / N * 2, r = Math.sqrt(1 - y * y), a = i * 2.39996;
+    sph.push([Math.cos(a) * r, y, Math.sin(a) * r]);
+  }
+  for (let u = 0; u < 16; u++) for (let v = 0; v < 4; v++) {
+    const a = u / 16 * Math.PI * 2, b = v / 4 * Math.PI * 2, R = 0.72 + 0.3 * Math.cos(b);
+    tor.push([Math.cos(a) * R, 0.3 * Math.sin(b), Math.sin(a) * R]);
+  }
+  for (let i = 0; i < N; i++) {
+    const st = i % 2, tt = Math.floor(i / 2) / 31 * 2 - 1, a = tt * Math.PI * 2 + st * Math.PI;
+    hel.push([Math.cos(a) * 0.55, tt, Math.sin(a) * 0.55]);
+  }
+  return [cube, sph, tor, hel];
+}
+const SHAPES = shapes();
+const BOB_PALS = [
+  ['#301040','#702080','#c040c0','#ff80ff','#fff'],
+  ['#002838','#006080','#00a0d0','#60e0ff','#fff'],
+  ['#382000','#805000','#d09000','#ffd040','#fff'],
+  ['#003010','#007028','#00c040','#70ff90','#fff']];
+function makeBob(r, pal) {
+  const c = document.createElement('canvas'); c.width = c.height = 2 * r + 1;
+  const x = c.getContext('2d');
+  for (let dy = -r; dy <= r; dy++) for (let dx = -r; dx <= r; dx++) {
+    const d2 = dx * dx + dy * dy; if (d2 > r * r + r * 0.8) continue;
+    const nz = Math.sqrt(Math.max(0, 1 - d2 / ((r + 0.5) * (r + 0.5))));
+    const l = (-dx / (r + 0.5)) * 0.45 + (-dy / (r + 0.5)) * 0.55 + nz * 0.7;
+    x.fillStyle = pal[Math.max(0, Math.min(4, Math.floor(l * 3.4)))];
+    x.fillRect(dx + r, dy + r, 1, 1);
+  }
+  return c;
+}
+const BOBS = BOB_PALS.map(p => [makeBob(2, p), makeBob(3, p), makeBob(4, p)]);
+const MORPH = 6, TRANS = 1.4;
+function drawBobs(t, pulseK) {
+  const cx = 265, cy = 103, ph = t / MORPH, si = Math.floor(ph) % 4, ni = (si + 1) % 4;
+  let f = (ph % 1) * MORPH - (MORPH - TRANS); f = Math.max(0, f / TRANS); f = f * f * (3 - 2 * f);
+  const A = SHAPES[si], B = SHAPES[ni];
+  const ax = t * 0.7, ay = t * 1.1, az = t * 0.35;
+  const [sx, cxr, sy, cyr, sz, czr] = [Math.sin(ax), Math.cos(ax), Math.sin(ay), Math.cos(ay), Math.sin(az), Math.cos(az)];
+  const R = 36 * (1 + 0.12 * pulseK), pts = [];
+  for (let i = 0; i < N; i++) {
+    let x = A[i][0] + (B[i][0] - A[i][0]) * f, y = A[i][1] + (B[i][1] - A[i][1]) * f, z = A[i][2] + (B[i][2] - A[i][2]) * f;
+    let y1 = y * cxr - z * sx, z1 = y * sx + z * cxr; y = y1; z = z1;
+    let x1 = x * cyr + z * sy; z1 = -x * sy + z * cyr; x = x1; z = z1;
+    x1 = x * czr - y * sz; y1 = x * sz + y * czr; x = x1; y = y1;
+    const p = 3 / (3 + z);
+    pts.push([cx + x * R * p, cy + y * R * p, z]);
+  }
+  pts.sort((a, b) => b[2] - a[2]);
+  const pal = BOBS[f > 0.5 ? ni : si];
+  for (const [x, y, z] of pts) {
+    const spr = pal[z < -0.35 ? 2 : z < 0.35 ? 1 : 0], r = (spr.width - 1) / 2;
+    g.drawImage(spr, Math.round(x - r), Math.round(y - r));
+  }
+}
+// --- falujący scroller ---
+const SCR = clean(SCROLL), sl = document.createElement('canvas'); sl.width = W; sl.height = 40;
+const sg = sl.getContext('2d'); sg.imageSmoothingEnabled = false;
+let scrollX = 0;
+function drawScroller(t, dt) {
+  scrollX += dt * 62;
+  const adv = 12, total = SCR.length * adv;
+  if (scrollX > total) scrollX -= total;
+  sg.globalCompositeOperation = 'source-over'; sg.clearRect(0, 0, W, 40);
+  const first = Math.floor(scrollX / adv), off = scrollX % adv;
+  for (let i = 0; i <= W / adv + 1; i++) {
+    const ch = SCR[(first + i) % SCR.length]; if (ch === ' ') continue;
+    const gl = glyph(ch, 2, '#fff'), bx = i * adv - off;
+    for (let c = 0; c < 5; c++) {
+      const x = Math.round(bx + c * 2); if (x < -2 || x > W) continue;
+      const y = Math.round(11 + Math.sin(x * 0.028 + t * 2.6) * 8);
+      sg.drawImage(gl, c * 2, 0, 2, 14, x, y, 2, 14);
+    }
+  }
+  sg.globalCompositeOperation = 'source-in';
+  const gr = sg.createLinearGradient(0, 0, W, 0);
+  for (let i = 0; i <= 8; i++) gr.addColorStop(i / 8, `hsl(${(i * 45 - t * 120) % 360 + 360},100%,62%)`);
+  sg.fillStyle = gr; sg.fillRect(0, 0, W, 40);
+  g.drawImage(sl, 0, 160);
+}
+// --- wskaźniki VU ---
+function drawVU(now) {
+  const ch = ['lead', 'arp', 'bass', 'kick'], cols = ['#f4f', '#4ff', '#ff4', '#f44'];
+  for (let i = 0; i < 4; i++) {
+    const lvl = Math.exp(-(now - hit[ch[i]]) * (ch[i] === 'arp' ? 9 : 5));
+    const h = Math.round(lvl * 14);
+    for (let k = 0; k < h; k += 2) { g.fillStyle = cols[i]; g.fillRect(296 + i * 5, 44 - k, 4, 1); }
+  }
+}
+
+/* =====================================================================
+   PĘTLA
+   ===================================================================== */
+let started = false, startT = 0, last = performance.now() / 1000;
+let schedTimer = null, paused = false, pausedAt = 0;
+function start() {
+  if (started) return;
+  started = true; paused = false;
+  if (!AC) initAudio(); else { AC.resume(); }
+  if (AC) {
+    nextT = AC.currentTime + 0.1; gstep = 0; events.length = 0;
+    endAt = nextT + END_STEP * STEP;
+    master.gain.cancelScheduledValues(AC.currentTime);
+    master.gain.setValueAtTime(muted ? 0 : 0.5, AC.currentTime);
+    if (!muted) { master.gain.setValueAtTime(0.5, endAt - 2.5); master.gain.linearRampToValueAtTime(0, endAt); }
+    if (!schedTimer) schedTimer = setInterval(sched, 25);
+  }
+  startT = performance.now() / 1000;
+}
+function stop() {
+  if (!started) return;
+  started = false; paused = false;
+  if (schedTimer) { clearInterval(schedTimer); schedTimer = null; }
+  if (AC) AC.suspend();
+  if (document.fullscreenElement) document.exitFullscreen().catch(() => {});
+}
+// Pauza: muzyka (zegar Web Audio) i animacja stają w miejscu, potem ruszają od tego samego momentu.
+function togglePause() {
+  paused = !paused;
+  const now = performance.now() / 1000;
+  if (paused) { pausedAt = now; if (AC) AC.suspend(); }
+  else { startT += now - pausedAt; if (AC) AC.resume(); }
+}
+addEventListener('click', start);
+addEventListener('keydown', e => {
+  const k = e.key.toLowerCase();
+  if (!started && (k === ' ' || k === 'enter')) { start(); e.preventDefault(); return; }
+  if (started && (k === ' ' || k === 'p')) { togglePause(); e.preventDefault(); return; }
+  if (started && (k === 'escape' || k === 'q' || k === 's')) { stop(); e.preventDefault(); return; }
+  if (k === 'm' && master) { muted = !muted; master.gain.cancelScheduledValues(AC.currentTime); master.gain.setTargetAtTime(muted ? 0 : 0.5, AC.currentTime, 0.02); }
+  if (k === 'f') { if (document.fullscreenElement) document.exitFullscreen(); else document.documentElement.requestFullscreen().catch(() => {}); }
+});
+
+// Pomoc w dolnym wierszu ekranu - zawsze widoczna, przygaszona.
+function drawHelp(now) {
+  const sp = !started ? 'SPACJA=START' : paused ? 'SPACJA=DALEJ' : 'SPACJA=PAUZA';
+  const h = sp + '  ' + (muted ? 'M=DŹWIĘK' : 'M=WYCISZ') + '  F=PEŁNY EKRAN' + (started ? '  ESC=STOP' : '');
+  g.fillStyle = '#000'; g.fillRect(0, 193, W, 7);
+  text(g, h, (W - textW(h, 1)) / 2 | 0, 193, 1, paused && Math.floor(now * 2) % 2 === 0 ? '#99b' : '#446');
+}
+
+function frame() {
+  const real = performance.now() / 1000, now = paused ? pausedAt : real;
+  const dt = paused ? 0 : Math.min(0.05, real - last); last = real;
+  g.fillStyle = '#000'; g.fillRect(0, 0, W, H);
+  if (!started) {
+    drawStars(dt, 0.25);
+    const l1 = 'JACEK & CLAUDE CREW', l2 = 'PREZENTUJE', l3 = 'TIDYSHOTS', l3b = 'ZDJĘCIA I FILMY W PORZĄDKU';
+    text(g, l1, (W - textW(l1, 2)) / 2 | 0, 40, 2, '#ff0');
+    text(g, l2, (W - textW(l2, 1)) / 2 | 0, 64, 1, '#9ef');
+    text(g, l3, (W - textW(l3, 3)) / 2 | 0, 78, 3, `hsl(${(now * 80) % 360},100%,60%)`);
+    text(g, l3b, (W - textW(l3b, 1)) / 2 | 0, 106, 1, '#9ef');
+    if (Math.floor(now * 2) % 2 === 0) { const l4 = endAt ? 'KONIEC - KLIKNIJ, ŻEBY OBEJRZEĆ JESZCZE RAZ' : 'KLIKNIJ ALBO NACIŚNIJ SPACJĘ'; text(g, l4, (W - textW(l4, 1)) / 2 | 0, 130, 1, '#fff'); }
+  } else {
+    const t = now - startT;
+    if (AC && endAt && AC.currentTime > endAt + 0.3) stop();
+    pumpEvents(now);
+    const kickK = Math.exp(-(now - hit.kick) * 8), snareK = Math.exp(-(now - hit.snare) * 7), leadK = Math.exp(-(now - hit.lead) * 10);
+    drawStars(dt, 0.35 + kickK * 0.6);
+    drawCopper(t);
+    drawLogo(t, leadK);
+    drawVU(now);
+    drawLine(48, t, snareK);
+    drawPanel(t, 0.6);
+    drawBobs(t, kickK);
+    drawLine(156, t + 1, snareK);
+    drawScroller(t, dt);
+    if (t < 0.6) { g.fillStyle = `rgba(255,255,255,${1 - t / 0.6})`; g.fillRect(0, 0, W, H); }
+    if (paused) {
+      const pz = 'PAUZA';
+      g.fillStyle = 'rgba(0,0,0,0.55)'; g.fillRect(0, 0, W, 192);
+      text(g, pz, ((W - textW(pz, 3)) / 2 | 0) + 2, 90, 3, '#000');
+      text(g, pz, (W - textW(pz, 3)) / 2 | 0, 88, 3, `hsl(${(real * 80) % 360},100%,60%)`);
+    }
+  }
+  drawHelp(real);
+  requestAnimationFrame(frame);
+}
+requestAnimationFrame(frame);
+</script>
+</body>
+</html>
